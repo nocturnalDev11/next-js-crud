@@ -19,38 +19,48 @@ export default function ItemForm({
 }) {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (itemToEdit) {
-        setName(itemToEdit.name);
-        setDescription(itemToEdit.description || '');
+            setName(itemToEdit.name);
+            setDescription(itemToEdit.description || '');
         }
     }, [itemToEdit]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (itemToEdit) {
-            // Update item
-            const res = await fetch('/api/items', {
-                method: 'PUT',
+        setError(null);
+
+        try {
+            const url = '/api/items';
+            const options = {
+                method: itemToEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: itemToEdit._id, name, description }),
-            });
-            const updatedItem: Item = await res.json();
-            setItems((prev) => prev.map((item) => (item._id === updatedItem._id ? updatedItem : item)));
-            setItemToEdit(null);
-        } else {
-            // Add new item
-            const res = await fetch('/api/items', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, description }),
-            });
-            const newItem: Item = await res.json();
-            setItems((prev) => [...prev, newItem]);
+                body: JSON.stringify(itemToEdit ? { id: itemToEdit._id, name, description } : { name, description }),
+            };
+
+            const res = await fetch(url, options);
+
+            if (!res.ok) {
+                throw new Error(`HTTP error! Status: ${res.status}`);
+            }
+
+            const data = await res.json();
+
+            if (itemToEdit) {
+                setItems((prev) => prev.map((item) => (item._id === data._id ? data : item)));
+                setItemToEdit(null);
+            } else {
+                setItems((prev) => [...prev, data]);
+            }
+
+            setName('');
+            setDescription('');
+        } catch (err) {
+            console.error(err);
+            setError('Failed to save item. Please try again.');
         }
-        setName('');
-        setDescription('');
     };
 
     return (
@@ -58,6 +68,7 @@ export default function ItemForm({
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">
                 {itemToEdit ? 'Edit Item' : 'Add New Item'}
             </h2>
+            {error && <p className="text-red-500 mb-4">{error}</p>}
             <div className="mb-4">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                     Name
@@ -84,7 +95,7 @@ export default function ItemForm({
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-500"
                 />
             </div>
-            
+
             <button
                 type="submit"
                 className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors duration-200"
